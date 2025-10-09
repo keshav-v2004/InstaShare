@@ -307,7 +307,7 @@ function useWebRTC() {
         if (payload.kind === "file-complete") {
           const ar = activeReceive.current
           if (ar && ar.id === payload.id) {
-            const blob = new Blob(ar.chunks, { type: ar.mime || "application/octet-stream" })
+            const blob = new Blob(ar.chunks.map(chunk => new Uint8Array(chunk)), { type: ar.mime || "application/octet-stream" })
             const url = URL.createObjectURL(blob)
             updateTransfer(ar.id, { status: "completed", downloadUrl: url, bytes: ar.bytes })
             activeReceive.current = null
