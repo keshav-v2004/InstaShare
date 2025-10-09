@@ -22,7 +22,7 @@ export default function PeerDiscovery({ peers, selectedPeerId, onSelect, connect
             <p className="opacity-70 text-sm">No peers yet. Open this page on another device.</p>
           </Card>
         ) : (
-          peers.map((p) => {
+          peers.map((p, i) => {
             const conn = connectionStates[p.id]
             const connected = conn?.pc === "connected" || conn?.dc === "open"
             return (
@@ -30,9 +30,10 @@ export default function PeerDiscovery({ peers, selectedPeerId, onSelect, connect
                 key={p.id}
                 onClick={() => onSelect(p.id)}
                 className={cn(
-                  "relative group rounded-lg border p-4 text-left transition-colors",
+                  "relative group rounded-lg border p-4 text-left transition-colors transition-transform duration-200 ease-out hover:-translate-y-0.5 animate-slide-fade-in",
                   selectedPeerId === p.id ? "bg-accent" : "hover:bg-muted",
                 )}
+                style={{ animationDelay: `${i * 50}ms` }}
               >
                 <div className="flex items-center gap-3">
                   <div className="relative h-10 w-10">

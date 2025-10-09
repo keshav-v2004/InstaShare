@@ -34,7 +34,7 @@ export default function TransferProgress({ transfers, onCancel, onAccept, onDecl
         {transfers.map((t) => {
           const pct = Math.min(100, Math.floor((t.bytes / Math.max(1, t.size)) * 100))
           return (
-            <Card key={t.id} className="p-4">
+            <Card key={t.id} className="p-4 animate-slide-fade-in">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="font-medium truncate">{t.fileName}</p>

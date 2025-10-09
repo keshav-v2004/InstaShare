@@ -12,7 +12,14 @@ export default function ConnectionStatus({
   const color = status === "open" ? "bg-emerald-500" : status === "connecting" ? "bg-amber-500" : "bg-destructive"
   return (
     <div className="inline-flex items-center gap-2 text-sm px-3 py-1 rounded-full border">
-      <span className={cn("h-2 w-2 rounded-full", color)} aria-hidden />
+      <span
+        className={cn(
+          "h-2 w-2 rounded-full",
+          color,
+          status === "connecting" ? "animate-pulse" : status === "open" ? "animate-pulse-slow" : "",
+        )}
+        aria-hidden
+      />
       <span className="sr-only">Signaling status:</span>
       <span>{status}</span>
       <span className="opacity-70">•</span>

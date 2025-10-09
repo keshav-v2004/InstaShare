@@ -19,8 +19,8 @@ function FileDropZone({ disabled, onFiles }: Props) {
       <h2 className="text-lg font-medium mb-3">Send Files</h2>
       <div
         className={cn(
-          "relative flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center transition-colors",
-          dragOver ? "bg-accent" : "hover:bg-muted",
+          "relative flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center transition-colors transition-transform duration-200 ease-out",
+          dragOver ? "bg-accent scale-[1.01] ring-2 ring-ring/50" : "hover:bg-muted",
           disabled && "opacity-50 pointer-events-none",
         )}
         onDragOver={(e) => {

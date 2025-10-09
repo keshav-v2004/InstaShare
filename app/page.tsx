@@ -35,7 +35,7 @@ export default function HomePage() {
   }, [signalingUrl])
 
   return (
-    <main className="mx-auto max-w-5xl p-6 space-y-6">
+      <main className="mx-auto max-w-5xl p-6 space-y-6 animate-slide-fade-in">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl md:text-3xl font-semibold text-pretty">AirDrop-like P2P Transfer</h1>
         <div className="flex items-center gap-3">
