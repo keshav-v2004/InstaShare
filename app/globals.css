@@ -156,4 +156,35 @@
   .animate-slide-fade-in {
     animation: slide-fade-in .4s cubic-bezier(0.22, 0.96, 0.3, 1) both;
   }
+
+    /* Keyframes for the typing effect */
+  @keyframes typing-boot {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
+  /* Keyframes for the blinking cursor */
+  @keyframes blink-caret-boot {
+    from,
+    to {
+      border-color: transparent;
+    }
+    50% {
+      /* Use a green color similar to old terminals */
+      border-color: oklch(0.7 0.2 140);
+    }
+  }
+
+  /* Utility class to apply the animations */
+  .animate-typing-boot {
+    /* The caret is created using a right border */
+    border-right: 0.15em solid oklch(0.7 0.2 140);
+    animation:
+      typing-boot 0.7s steps(40, end),
+      blink-caret-boot 0.75s step-end infinite;
+  }
 }
