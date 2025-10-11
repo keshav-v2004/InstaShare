@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 import type { Transfer } from "@/components/transfer-progress"
 
 type Peer = { id: string; name: string }
@@ -24,20 +25,29 @@ type DCControl =
 const STUN = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
 const CHUNK_SIZE = 64 * 1024 // 64KB
 
+// Find and replace this entire function in hooks/use-webrtc.ts
+
 function computeWSUrl() {
-  const fromEnv = process.env.NEXT_PUBLIC_SIGNALING_URL
+  const fromEnv = process.env.NEXT_PUBLIC_SIGNALING_URL;
   if (fromEnv && typeof fromEnv === "string" && fromEnv.trim().length > 0) {
-    return fromEnv
+    return fromEnv;
   }
 
   if (typeof window !== "undefined") {
-    // Default to ws://localhost:3001 in dev; otherwise upgrade origin to ws(s)
-    const origin = window.location.origin
-    if (origin.includes("localhost") || origin.includes("127.0.0.1")) return "ws://localhost:3001"
-    // Ensure secure ws when served over https
-    return origin.replace(/^http/, "ws")
+    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+
+    // If on the local machine for development, use localhost:3001
+    if (isLocal) {
+      return "ws://localhost:3001";
+    }
+
+    // ✨ KEY CHANGE: If on the network (e.g., 192.168.1.15), use that IP but with port 3001
+    return `${protocol}${window.location.hostname}:3001`;
   }
-  return "ws://localhost:3001"
+
+  // Fallback for server-side rendering
+  return "ws://localhost:3001";
 }
 
 function useWebRTC() {
@@ -46,19 +56,15 @@ function useWebRTC() {
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null)
   const [signalingStatus, setSignalingStatus] = useState<"connecting" | "open" | "closed" | "error">("connecting")
 
-  // transfers by id
   const [transfers, setTransfers] = useState<Transfer[]>([])
-  // connection and data channel state maps
   const pcs = useRef(new Map<string, RTCPeerConnection>())
   const dcs = useRef(new Map<string, RTCDataChannel>())
-  const connState = useRef(
-    new Map<string, { pc?: RTCPeerConnection["connectionState"]; dc?: RTCDataChannel["readyState"] }>(),
-  )
+  const connState = useRef(new Map<string, { pc?: RTCPeerConnection["connectionState"]; dc?: RTCDataChannel["readyState"] }>())
   const connectionStates = useMemo(() => {
     const out: Record<string, { pc?: RTCPeerConnection["connectionState"]; dc?: RTCDataChannel["readyState"] }> = {}
     for (const [k, v] of connState.current) out[k] = { ...v }
     return out
-  }, [peers, transfers]) // roughly update on changes
+  }, [peers, transfers])
 
   const activeReceive = useRef<{
     peerId: string
@@ -69,25 +75,15 @@ function useWebRTC() {
     chunks: Uint8Array[]
     bytes: number
   } | null>(null)
-  const cancelSendFlags = useRef(new Set<string>()) // transferId set to cancel
+  const cancelSendFlags = useRef(new Set<string>())
 
   const wsRef = useRef<WebSocket | null>(null)
 
   const cleanupPeer = (peerId: string) => {
-    const dc = dcs.current.get(peerId)
-    if (dc) {
-      try {
-        dc.close()
-      } catch {}
-      dcs.current.delete(peerId)
-    }
-    const pc = pcs.current.get(peerId)
-    if (pc) {
-      try {
-        pc.close()
-      } catch {}
-      pcs.current.delete(peerId)
-    }
+    dcs.current.get(peerId)?.close()
+    dcs.current.delete(peerId)
+    pcs.current.get(peerId)?.close()
+    pcs.current.delete(peerId)
     connState.current.set(peerId, { pc: "closed", dc: "closed" })
     bumpConn()
   }
@@ -95,13 +91,7 @@ function useWebRTC() {
   const [, setConnTick] = useState(0)
   const bumpConn = () => setConnTick((n) => n + 1)
 
-  const pendingReceives = useRef(
-    new Map<
-      string,
-      { peerId: string; name: string; size: number; mime: string; chunks: Uint8Array[]; bytes: number }
-    >(),
-  )
-
+  const pendingReceives = useRef(new Map<string, { peerId: string; name: string; size: number; mime: string; chunks: Uint8Array[]; bytes: number }>())
   const acceptWaiters = useRef(new Map<string, (ok: boolean) => void>())
 
   const addTransfer = (t: Omit<Transfer, "bytes" | "status">) => {
@@ -131,8 +121,7 @@ function useWebRTC() {
     return computeWSUrl()
   })
   const signalingUrl = signalingUrlState
-  const isMixedContent =
-    typeof window !== "undefined" && window.location.protocol === "https:" && signalingUrl.startsWith("ws://")
+  const isMixedContent = typeof window !== "undefined" && window.location.protocol === "https:" && signalingUrl.startsWith("ws://")
 
   const setSignalingUrl = (next: string) => {
     const clean = (next || "").trim()
@@ -144,7 +133,29 @@ function useWebRTC() {
     setSignalingUrlState(clean)
   }
 
-  // WebSocket signaling
+  const declineTransfer = useCallback((id: string) => {
+    const meta = pendingReceives.current.get(id)
+    if (!meta) return
+    const { peerId } = meta
+    const dc = dcs.current.get(peerId)
+    if (dc && dc.readyState === "open") {
+      dc.send(JSON.stringify({ kind: "file-decline", id } as DCControl))
+    }
+    pendingReceives.current.delete(id)
+    updateTransfer(id, { status: "canceled", error: "Declined" })
+  }, [])
+
+  const acceptTransfer = useCallback((id: string) => {
+    const meta = pendingReceives.current.get(id)
+    if (!meta) return
+    const { peerId, name, size, mime } = meta
+    const dc = dcs.current.get(peerId)
+    if (!dc || dc.readyState !== "open") return
+    dc.send(JSON.stringify({ kind: "file-accept", id } as DCControl))
+    activeReceive.current = { peerId, id, name, mime, size, chunks: [], bytes: 0 }
+    updateTransfer(id, { status: "in-progress" })
+  }, [])
+
   const setupSignaling = useCallback(() => {
     try {
       const url = signalingUrl
@@ -188,17 +199,13 @@ function useWebRTC() {
   useEffect(() => {
     setupSignaling()
     return () => {
-      try {
-        wsRef.current?.close()
-      } catch {}
+      wsRef.current?.close()
       for (const id of pcs.current.keys()) cleanupPeer(id)
     }
   }, [setupSignaling])
 
   const reconnectSignaling = useCallback(() => {
-    try {
-      wsRef.current?.close()
-    } catch {}
+    wsRef.current?.close()
     setupSignaling()
   }, [setupSignaling])
 
@@ -208,7 +215,6 @@ function useWebRTC() {
     ws.send(JSON.stringify({ type: "signal", to, data }))
   }
 
-  // WebRTC helpers
   const ensurePeerConnection = async (peerId: string, initiator: boolean) => {
     let pc = pcs.current.get(peerId)
     if (!pc) {
@@ -256,7 +262,6 @@ function useWebRTC() {
       bumpConn()
     }
     dc.onmessage = (ev) => {
-      // Control messages are JSON; chunks are ArrayBuffer
       if (typeof ev.data === "string") {
         let payload: DCControl | null = null
         try {
@@ -268,10 +273,20 @@ function useWebRTC() {
           const { id, name, size, mime } = payload
           const peerName = peers.find((p) => p.id === peerId)?.name || "Peer"
           pendingReceives.current.set(id, { peerId, name, size, mime, chunks: [], bytes: 0 })
-          setTransfers((prev) => [
-            { id, peerId, peerName, fileName: name, mime, size, direction: "receive", bytes: 0, status: "pending" },
-            ...prev,
-          ])
+          setTransfers((prev) => [{ id, peerId, peerName, fileName: name, mime, size, direction: "receive", bytes: 0, status: "pending" }, ...prev])
+
+          // ✨ TOAST NOTIFICATION IMPLEMENTED HERE
+          toast.info(`Incoming file from ${peerName}: ${name}`, {
+            action: {
+              label: "Accept",
+              onClick: () => acceptTransfer(id),
+            },
+            cancel: {
+              label: "Decline",
+              onClick: () => declineTransfer(id),
+            },
+            duration: 30000,
+          })
           return
         }
         if (payload.kind === "file-accept") {
@@ -288,22 +303,9 @@ function useWebRTC() {
             acceptWaiters.current.delete(payload.id)
             waiter(false)
           }
-          // if sender didn't set a waiter, still mark canceled just in case
           updateTransfer(payload.id, { status: "canceled", error: payload.reason || "Declined by recipient" })
           return
         }
-
-        if (payload.kind === "file-meta") {
-          const { id, name, size, mime } = payload
-          const peerName = peers.find((p) => p.id === peerId)?.name || "Peer"
-          activeReceive.current = { peerId, id, name, mime, size, chunks: [], bytes: 0 }
-          setTransfers((prev) => [
-            { id, peerId, peerName, fileName: name, mime, size, direction: "receive", bytes: 0, status: "in-progress" },
-            ...prev,
-          ])
-          return
-        }
-
         if (payload.kind === "file-complete") {
           const ar = activeReceive.current
           if (ar && ar.id === payload.id) {
@@ -361,14 +363,12 @@ function useWebRTC() {
     await ensurePeerConnection(peerId, true)
   }, [])
 
-  // Sending files
   const sendFileToSelectedPeer = useCallback(
     async (file: File) => {
       if (!selectedPeerId) return
       const peerId = selectedPeerId
       await ensurePeerConnection(peerId, true)
 
-      // wait for DC open if needed
       const dc = dcs.current.get(peerId)
       if (!dc || dc.readyState !== "open") {
         const ok = await new Promise<boolean>((res) => {
@@ -384,35 +384,21 @@ function useWebRTC() {
             }
           }, 100)
         })
-        if (!ok) return
+        if (!ok) {
+          toast.error("Failed to establish data channel.")
+          return
+        }
       }
 
       const transferId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
       const peerName = peers.find((p) => p.id === peerId)?.name || "Peer"
-      addTransfer({
-        id: transferId,
-        peerId,
-        peerName,
-        fileName: file.name,
-        mime: file.type || "application/octet-stream",
-        size: file.size,
-        direction: "send",
-      })
-      // updateTransfer(transferId, { status: "in-progress" })
+      addTransfer({ id: transferId, peerId, peerName, fileName: file.name, mime: file.type || "application/octet-stream", size: file.size, direction: "send" })
 
-      // Send an offer and wait for accept/decline
-      const offerMsg: DCControl = {
-        kind: "file-offer",
-        id: transferId,
-        name: file.name,
-        size: file.size,
-        mime: file.type || "application/octet-stream",
-      }
+      const offerMsg: DCControl = { kind: "file-offer", id: transferId, name: file.name, size: file.size, mime: file.type || "application/octet-stream" }
       dcs.current.get(peerId)?.send(JSON.stringify(offerMsg))
 
       const accepted = await new Promise<boolean>((resolve) => {
         acceptWaiters.current.set(transferId, resolve)
-        // optional timeout 30s
         setTimeout(() => {
           if (acceptWaiters.current.delete(transferId)) resolve(false)
         }, 30000)
@@ -474,34 +460,12 @@ function useWebRTC() {
       if (!tx) return
       if (tx.direction === "send") {
         cancelSendFlags.current.add(id)
+      } else if (tx.direction === "receive" && tx.status !== "completed") {
+        declineTransfer(id)
       }
     },
-    [transfers],
+    [transfers, declineTransfer],
   )
-
-  const acceptTransfer = useCallback((id: string) => {
-    const meta = pendingReceives.current.get(id)
-    if (!meta) return
-    const { peerId, name, size, mime } = meta
-    const dc = dcs.current.get(peerId)
-    if (!dc || dc.readyState !== "open") return
-    dc.send(JSON.stringify({ kind: "file-accept", id } as DCControl))
-    // initialize active receive
-    activeReceive.current = { peerId, id, name, mime, size, chunks: [], bytes: 0 }
-    updateTransfer(id, { status: "in-progress" })
-  }, [])
-
-  const declineTransfer = useCallback((id: string) => {
-    const meta = pendingReceives.current.get(id)
-    if (!meta) return
-    const { peerId } = meta
-    const dc = dcs.current.get(peerId)
-    if (dc && dc.readyState === "open") {
-      dc.send(JSON.stringify({ kind: "file-decline", id } as DCControl))
-    }
-    pendingReceives.current.delete(id)
-    updateTransfer(id, { status: "canceled", error: "Declined" })
-  }, [])
 
   return {
     self,
