@@ -1,3 +1,5 @@
+// this has path app/page.tsx
+
 "use client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -7,7 +9,8 @@ import PeerDiscovery from "@/components/peer-discovery"
 import FileDropZone from "@/components/file-drop-zone"
 import TransferProgress from "@/components/transfer-progress"
 import ConnectionStatus from "@/components/connection-status"
-import useWebRTC from "@/hooks/use-webrtc" // Declare the useWebRTC hook
+import TextMessaging from "@/components/text-messaging"
+import useWebRTC from "@/hooks/use-webrtc"
 
 export default function HomePage() {
   const {
@@ -19,6 +22,8 @@ export default function HomePage() {
     selectedPeerId,
     setSelectedPeerId,
     sendFileToSelectedPeer,
+    sendTextMessage, // ✨ NEW
+    messages, // ✨ NEW
     cancelTransfer,
     reconnectSignaling,
     signalingStatus,
@@ -34,8 +39,10 @@ export default function HomePage() {
     setSigUrlDraft(signalingUrl)
   }, [signalingUrl])
 
+  const selectedPeerName = peers.find(p => p.id === selectedPeerId)?.name
+
   return (
-      <main className="mx-auto max-w-5xl p-6 space-y-6 animate-slide-fade-in">
+    <main className="mx-auto max-w-5xl p-6 space-y-6 animate-slide-fade-in">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl md:text-3xl font-semibold text-pretty">AirDrop-like P2P Transfer</h1>
         <div className="flex items-center gap-3">
@@ -110,6 +117,15 @@ export default function HomePage() {
         onCancel={cancelTransfer}
         onAccept={(id) => acceptTransfer(id)}
         onDecline={(id) => declineTransfer(id)}
+      />
+
+      {/* ✨ NEW: Text Messaging Component */}
+      <TextMessaging
+        messages={messages}
+        selectedPeerId={selectedPeerId}
+        selectedPeerName={selectedPeerName}
+        onSendMessage={sendTextMessage}
+        disabled={!selectedPeerId}
       />
 
       <footer className="text-center text-sm opacity-70 pt-6">

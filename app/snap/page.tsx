@@ -1,12 +1,15 @@
+// app/snap/page.tsx - REPLACE THE ENTIRE FILE
+
 "use client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useWebRTC } from "@/hooks/use-webrtc"
 import PeerDiscovery from "@/components/peer-discovery"
-import { FileDropZone } from "@/components/file-drop-zone"
-import { TransferProgress } from "@/components/transfer-progress"
+import FileDropZone from "@/components/file-drop-zone"
+import TransferProgress from "@/components/transfer-progress"
 import ConnectionStatus from "@/components/connection-status"
+import TextMessaging from "@/components/text-messaging"
 
 export default function SnapPage() {
   const {
@@ -16,6 +19,8 @@ export default function SnapPage() {
     setSelectedPeerId,
     selectPeerAndConnect,
     sendFileToSelectedPeer,
+    sendTextMessage, // ✨ NEW
+    messages, // ✨ NEW
     transfers,
     cancelTransfer,
     acceptTransfer,
@@ -25,6 +30,8 @@ export default function SnapPage() {
     reconnectSignaling,
     signalingUrl,
   } = useWebRTC()
+
+  const selectedPeerName = peers.find(p => p.id === selectedPeerId)?.name
 
   return (
     <main className="container mx-auto max-w-3xl p-4">
@@ -84,6 +91,15 @@ export default function SnapPage() {
           onDecline={declineTransfer}
         />
       </Card>
+
+      {/* ✨ NEW: Text Messaging Component */}
+      <TextMessaging
+        messages={messages}
+        selectedPeerId={selectedPeerId}
+        selectedPeerName={selectedPeerName}
+        onSendMessage={sendTextMessage}
+        disabled={!selectedPeerId}
+      />
 
       <footer className="mt-6 text-center text-xs text-muted-foreground">
         Signaling: <span className="font-mono">{signalingUrl}</span>

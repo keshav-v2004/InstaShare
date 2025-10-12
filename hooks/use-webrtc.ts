@@ -1,3 +1,5 @@
+// this has path hooks/use-webrtc.ts
+
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -17,15 +19,23 @@ type DCControl =
   | { kind: "file-offer"; id: string; name: string; size: number; mime: string }
   | { kind: "file-accept"; id: string }
   | { kind: "file-decline"; id: string; reason?: string }
-  | { kind: "file-meta"; id: string; name: string; size: number; mime: string } // legacy support
+  | { kind: "file-meta"; id: string; name: string; size: number; mime: string }
   | { kind: "file-complete"; id: string }
   | { kind: "file-cancel"; id: string; reason?: string }
+  | { kind: "text-message"; id: string; text: string; timestamp: number }
   | { kind: "ping" }
 
-const STUN = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
-const CHUNK_SIZE = 64 * 1024 // 64KB
+type TextMessage = {
+  id: string
+  peerId: string
+  peerName: string
+  text: string
+  timestamp: number
+  direction: "sent" | "received"
+}
 
-// Find and replace this entire function in hooks/use-webrtc.ts
+const STUN = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
+const CHUNK_SIZE = 64 * 1024
 
 function computeWSUrl() {
   const fromEnv = process.env.NEXT_PUBLIC_SIGNALING_URL;
@@ -37,16 +47,13 @@ function computeWSUrl() {
     const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
 
-    // If on the local machine for development, use localhost:3001
     if (isLocal) {
       return "ws://localhost:3001";
     }
 
-    // ✨ KEY CHANGE: If on the network (e.g., 192.168.1.15), use that IP but with port 3001
     return `${protocol}${window.location.hostname}:3001`;
   }
 
-  // Fallback for server-side rendering
   return "ws://localhost:3001";
 }
 
@@ -55,6 +62,7 @@ function useWebRTC() {
   const [peers, setPeers] = useState<Peer[]>([])
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null)
   const [signalingStatus, setSignalingStatus] = useState<"connecting" | "open" | "closed" | "error">("connecting")
+  const [messages, setMessages] = useState<TextMessage[]>([])
 
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const pcs = useRef(new Map<string, RTCPeerConnection>())
@@ -269,13 +277,43 @@ function useWebRTC() {
         } catch {}
         if (!payload) return
 
+        // ✨ NEW: Handle text messages
+        if (payload.kind === "text-message") {
+          const { id, text, timestamp } = payload
+          const peerName = peers.find((p) => p.id === peerId)?.name || "Peer"
+          
+          const newMessage: TextMessage = {
+            id,
+            peerId,
+            peerName,
+            text,
+            timestamp,
+            direction: "received"
+          }
+          
+          setMessages((prev) => [newMessage, ...prev])
+          
+          // Show actionable notification
+          toast.message(`Message from ${peerName}`, {
+            description: text.length > 100 ? text.substring(0, 100) + "..." : text,
+            action: {
+              label: "Reply",
+              onClick: () => {
+                setSelectedPeerId(peerId)
+                // You can add auto-focus to text input here if needed
+              },
+            },
+            duration: 10000,
+          })
+          return
+        }
+
         if (payload.kind === "file-offer") {
           const { id, name, size, mime } = payload
           const peerName = peers.find((p) => p.id === peerId)?.name || "Peer"
           pendingReceives.current.set(id, { peerId, name, size, mime, chunks: [], bytes: 0 })
           setTransfers((prev) => [{ id, peerId, peerName, fileName: name, mime, size, direction: "receive", bytes: 0, status: "pending" }, ...prev])
 
-          // ✨ TOAST NOTIFICATION IMPLEMENTED HERE
           toast.info(`Incoming file from ${peerName}: ${name}`, {
             action: {
               label: "Accept",
@@ -360,8 +398,80 @@ function useWebRTC() {
   }
 
   const selectPeerAndConnect = useCallback(async (peerId: string) => {
-    await ensurePeerConnection(peerId, true)
-  }, [])
+    try {
+      await ensurePeerConnection(peerId, true)
+      
+      // Wait for data channel to open
+      const maxWait = 100 // 10 seconds
+      let tries = 0
+      
+      const waitForChannel = setInterval(() => {
+        const dc = dcs.current.get(peerId)
+        tries++
+        
+        if (dc && dc.readyState === "open") {
+          clearInterval(waitForChannel)
+          toast.success(`Connected to ${peers.find(p => p.id === peerId)?.name || "peer"}`)
+        } else if (tries > maxWait) {
+          clearInterval(waitForChannel)
+          console.warn("Data channel took longer than expected to open")
+        }
+      }, 100)
+    } catch (error) {
+      console.error("Failed to connect:", error)
+      toast.error("Failed to establish connection")
+    }
+  }, [peers])
+
+  // ✨ NEW: Send text message function
+  const sendTextMessage = useCallback(
+    async (text: string) => {
+      if (!selectedPeerId || !text.trim()) return false
+      
+      const peerId = selectedPeerId
+      await ensurePeerConnection(peerId, true)
+
+      const dc = dcs.current.get(peerId)
+      if (!dc || dc.readyState !== "open") {
+        toast.error("Connection not ready. Please wait...")
+        return false
+      }
+
+      const messageId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+      const timestamp = Date.now()
+      const peerName = peers.find((p) => p.id === peerId)?.name || "Peer"
+
+      const messagePayload: DCControl = {
+        kind: "text-message",
+        id: messageId,
+        text: text.trim(),
+        timestamp,
+      }
+
+      try {
+        dc.send(JSON.stringify(messagePayload))
+        
+        // Add to local messages
+        const newMessage: TextMessage = {
+          id: messageId,
+          peerId,
+          peerName,
+          text: text.trim(),
+          timestamp,
+          direction: "sent"
+        }
+        
+        setMessages((prev) => [newMessage, ...prev])
+        
+        toast.success(`Message sent to ${peerName}`)
+        return true
+      } catch (error) {
+        toast.error("Failed to send message")
+        return false
+      }
+    },
+    [selectedPeerId, peers]
+  )
 
   const sendFileToSelectedPeer = useCallback(
     async (file: File) => {
@@ -474,6 +584,8 @@ function useWebRTC() {
     setSelectedPeerId,
     selectPeerAndConnect,
     sendFileToSelectedPeer,
+    sendTextMessage, // ✨ NEW
+    messages, // ✨ NEW
     cancelTransfer,
     signalingStatus,
     reconnectSignaling,
@@ -489,3 +601,4 @@ function useWebRTC() {
 
 export default useWebRTC
 export { useWebRTC }
+export type { TextMessage, Peer }
