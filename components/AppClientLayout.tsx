@@ -1,7 +1,10 @@
+// this has path components/AppClientLayout.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { BootAnimation } from "@/components/ui/boot-animation";
+import path from "path";
 
 export default function AppClientLayout({ children }: { children: React.ReactNode }) {
   // Start in booting state by default

@@ -1,3 +1,5 @@
+// this has path backend/server.js
+
 // Simple WebSocket signaling server using Express + ws. No file storage.
 // It assigns each client a random "codename" and broadcasts presence.
 // Messages:

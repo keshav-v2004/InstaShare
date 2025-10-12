@@ -1,3 +1,5 @@
+// this has path components/file-drop-zone.tsx
+
 "use client"
 
 import { useRef, useState } from "react"

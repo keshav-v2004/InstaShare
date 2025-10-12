@@ -1,3 +1,5 @@
+// this has path components/peer-discovery.tsx
+
 "use client"
 
 import { cn } from "@/lib/utils"

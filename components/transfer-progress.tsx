@@ -1,3 +1,5 @@
+// this has path components/transfer-progress.tsx
+
 "use client"
 
 import { Progress } from "@/components/ui/progress"
