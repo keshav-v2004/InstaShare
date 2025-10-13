@@ -10,7 +10,7 @@ import AppClientLayout from "@/components/AppClientLayout"; // 1. Import the wra
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "P2P File Transfer",
+  title: "InstaShare",
   description: "Share files directly, device-to-device with WebRTC.",
 };
 

@@ -1,3 +1,5 @@
+// this has path components/connection-status.tsx
+
 "use client"
 
 import { cn } from "@/lib/utils"
