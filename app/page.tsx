@@ -44,7 +44,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-5xl p-6 space-y-6 animate-slide-fade-in">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl md:text-3xl font-semibold text-pretty">AirDrop-like P2P Transfer</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold text-pretty">InstaShare - Transfer files and text instantly!</h1>
         <div className="flex items-center gap-3">
           <ConnectionStatus status={signalingStatus} peersCount={peers.length} />
           <Button variant="outline" onClick={reconnectSignaling}>
