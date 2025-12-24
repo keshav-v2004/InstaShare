@@ -1,10 +1,13 @@
-# ⚡InstaShare - Transfer files and text instantly!
+# <img src="https://github.com/user-attachments/assets/6d098aa0-2fa2-4143-879c-8d39d52e715a" alt="InstaShare Logo" width="125" /> InstaShare - Transfer files and text instantly!
 ## 💡Built with passion for privacy, speed, and simplicity.
 
 A modern, **peer-to-peer file and text sharing application** built with **WebRTC**, **Next.js**, and **TypeScript**.  
 Share files and messages directly between any two devices with a web browser on the same network— **no uploads, no cloud, no middlemen.**
 
 🔗 **Live Demo:** https://insta-share-seven.vercel.app
+
+<img width="100%" alt="InstaShare UI Screenshot" src="https://github.com/user-attachments/assets/8ec34d59-d776-462f-9985-a32bbda045c1" />
+
 
 ---
 
@@ -70,20 +73,10 @@ The connection process between two devices involves a brief **signaling phase** 
 
 ---
 
-## 🚀 Development Setup
 
-Follow these instructions to get the project running locally.
+## 🚀 Deployment
 
-### ✅ Prerequisites
+The application uses a decoupled architecture to ensure speed and reliability:
 
-- [Node.js](https://nodejs.org/) (v18 or later)
-- npm, yarn, or pnpm
-
----
-
-### 🧩 Installation & Setup
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/your-repo-name.git
-   cd your-repo-name
+- **Frontend:** The Next.js client interface is deployed on **[Vercel](https://vercel.com/)**, leveraging their global edge network for fast loading times.
+- **Backend:** The WebSocket signaling server is hosted on **[Render](https://render.com/)**, managing the real-time handshakes between peers.
