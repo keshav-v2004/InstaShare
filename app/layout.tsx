@@ -6,6 +6,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import AppClientLayout from "@/components/AppClientLayout"; // 1. Import the wrapper
+import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,14 +24,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={cn(
-          "min-h-screen bg-background font-sans antialiased",
+          "min-h-screen bg-background font-sans antialiased transition-colors duration-300",
           inter.className
         )}
       >
-        {/* 2. Wrap the children with AppClientLayout */}
-        <AppClientLayout>
-          {children}
-        </AppClientLayout>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {/* 2. Wrap the children with AppClientLayout */}
+          <AppClientLayout>{children}</AppClientLayout>
+        </ThemeProvider>
 
         <Toaster richColors position="top-right" />
       </body>

@@ -10,6 +10,7 @@ import FileDropZone from "@/components/file-drop-zone"
 import TransferProgress from "@/components/transfer-progress"
 import ConnectionStatus from "@/components/connection-status"
 import TextMessaging from "@/components/text-messaging"
+import ThemeToggle from "@/components/theme-toggle"
 
 export default function SnapPage() {
   const {
@@ -34,7 +35,7 @@ export default function SnapPage() {
   const selectedPeerName = peers.find(p => p.id === selectedPeerId)?.name
 
   return (
-    <main className="container mx-auto max-w-3xl p-4">
+    <main className="container mx-auto max-w-3xl p-4 transition-colors duration-300">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-pretty">Snapdrop-like</h1>
         <p className="text-sm text-muted-foreground">
@@ -49,6 +50,7 @@ export default function SnapPage() {
             <div className="font-medium">{self?.name || "Connecting..."}</div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <ConnectionStatus 
               status={signalingStatus} 
               peersCount={peers.length} 

@@ -64,6 +64,8 @@ function useWebRTC() {
   const [signalingStatus, setSignalingStatus] = useState<"connecting" | "open" | "closed" | "error">("connecting")
   const [messages, setMessages] = useState<TextMessage[]>([])
 
+  const [connTick, setConnTick] = useState(0)
+
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const pcs = useRef(new Map<string, RTCPeerConnection>())
   const dcs = useRef(new Map<string, RTCDataChannel>())
@@ -72,7 +74,7 @@ function useWebRTC() {
     const out: Record<string, { pc?: RTCPeerConnection["connectionState"]; dc?: RTCDataChannel["readyState"] }> = {}
     for (const [k, v] of connState.current) out[k] = { ...v }
     return out
-  }, [peers, transfers])
+  }, [peers, transfers, connTick])
 
   const activeReceive = useRef<{
     peerId: string
@@ -96,7 +98,6 @@ function useWebRTC() {
     bumpConn()
   }
 
-  const [, setConnTick] = useState(0)
   const bumpConn = () => setConnTick((n) => n + 1)
 
   const pendingReceives = useRef(new Map<string, { peerId: string; name: string; size: number; mime: string; chunks: Uint8Array[]; bytes: number }>())
@@ -123,7 +124,20 @@ function useWebRTC() {
       if (q && q.trim()) return q.trim()
       try {
         const stored = window.localStorage.getItem("signalingUrl")
-        if (stored && stored.trim()) return stored.trim()
+        if (stored && stored.trim()) {
+          const value = stored.trim()
+          const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+          if (isLocalHost) {
+            // Auto-upgrade common local defaults from :3000 to :3001 for signaling
+            const needsUpgrade = /^ws:\/\/(localhost|127\.0\.0\.1):3000\/?$/i.test(value)
+            if (needsUpgrade) {
+              const upgraded = "ws://localhost:3001"
+              try { window.localStorage.setItem("signalingUrl", upgraded) } catch {}
+              return upgraded
+            }
+          }
+          return value
+        }
       } catch {}
     }
     return computeWSUrl()
@@ -380,6 +394,7 @@ function useWebRTC() {
       }
       pc.onconnectionstatechange = () => {
         connState.current.set(from, { ...(connState.current.get(from) || {}), pc: pc?.connectionState })
+        bumpConn()
       }
       pc.ondatachannel = (e) => setupDataChannel(from, e.channel)
       await pc.setRemoteDescription(new RTCSessionDescription(data.sdp))

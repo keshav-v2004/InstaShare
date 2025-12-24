@@ -5,11 +5,13 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import PeerDiscovery from "@/components/peer-discovery"
 import FileDropZone from "@/components/file-drop-zone"
 import TransferProgress from "@/components/transfer-progress"
 import ConnectionStatus from "@/components/connection-status"
 import TextMessaging from "@/components/text-messaging"
+import ThemeToggle from "@/components/theme-toggle"
 import useWebRTC from "@/hooks/use-webrtc"
 
 export default function HomePage() {
@@ -42,10 +44,14 @@ export default function HomePage() {
   const selectedPeerName = peers.find(p => p.id === selectedPeerId)?.name
 
   return (
-    <main className="mx-auto max-w-5xl p-6 space-y-6 animate-slide-fade-in">
+    <main className="mx-auto max-w-5xl p-6 space-y-6 animate-slide-fade-in transition-colors duration-300">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl md:text-3xl font-semibold text-pretty">InstaShare - Transfer files and text instantly!</h1>
+        <h1 className="flex items-center gap-3 text-2xl md:text-3xl font-semibold text-pretty">
+          <Image src="/instaShare-logo.png" alt="InstaShare logo" width={240} height={240} priority />
+          <span>InstaShare - Transfer files and text instantly!</span>
+        </h1>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <ConnectionStatus status={signalingStatus} peersCount={peers.length} />
           <Button variant="outline" onClick={reconnectSignaling}>
             Reconnect
